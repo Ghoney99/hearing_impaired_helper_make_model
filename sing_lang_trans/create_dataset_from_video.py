@@ -1,155 +1,110 @@
 import cv2
-import sys, os
+import sys
+import os
 import mediapipe as mp
 import numpy as np
 import modules.holistic_module as hm
-from modules.utils import createDirectory
-import json
+from modules.utils import createDirectory, Vector_Normalization
 import time
 
-from modules.utils import Vector_Normalization
-
+# 출력 비디오를 저장할 디렉토리 생성
 createDirectory('dataset/output_video')
 
-# 저장할 파일 이름
-save_file_name = "train"
-
-# 시퀀스의 길이(30 -> 10)
-seq_length = 10
-
-
+# 설정
+seq_length = 10  # 시퀀스 길이
 actions = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
-             'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ',
-             'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅢ', 'ㅚ', 'ㅟ']
+           'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ',
+           'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅢ', 'ㅚ', 'ㅟ']  # 인식할 동작 목록
 
-dataset = dict()
+# 데이터셋 초기화
+dataset = {i: [] for i in range(len(actions))}
 
-for i in range(len(actions)):
-    dataset[i] = []
-
-# MediaPipe holistic model
+# MediaPipe 홀리스틱 모델 초기화
 detector = hm.HolisticDetector(min_detection_confidence=0.3)
 
+# 비디오 파일 목록 생성
 videoFolderPath = "dataset/output_video"
-videoTestList = os.listdir(videoFolderPath)
+testTargetList = []
 
-testTargetList =[]
+def get_video_files(folder_path):
+    """
+    지정된 폴더에서 모든 비디오 파일의 경로를 재귀적으로 찾아 리스트로 반환
+    """
+    for videoPath in os.listdir(folder_path):
+        actionVideoPath = os.path.join(folder_path, videoPath)
+        for actionVideo in os.listdir(actionVideoPath):
+            fullVideoPath = os.path.join(actionVideoPath, actionVideo)
+            testTargetList.append(fullVideoPath)
 
-created_time = int(time.time())
+get_video_files(videoFolderPath)
 
-for videoPath in videoTestList:
-    actionVideoPath = f'{videoFolderPath}/{videoPath}'
-    actionVideoList = os.listdir(actionVideoPath)
-    for actionVideo in actionVideoList:
-        fullVideoPath = f'{actionVideoPath}/{actionVideo}'
-        testTargetList.append(fullVideoPath)
+# 비디오 파일 목록을 정렬 (파일명의 두 번째 부분을 기준으로 역순 정렬)
+testTargetList = sorted(testTargetList, key=lambda x: x.split("/")[-2], reverse=True)
+print("Video List:", testTargetList)
 
-print("---------- Start Video List ----------")
-testTargetList = sorted(testTargetList, key=lambda x:x[x.find("/", 9)+1], reverse=True)
-print(testTargetList)
-print("----------  End Video List  ----------\n")
-
-for target in testTargetList:
-
+def process_video(video_path):
+    """
+    주어진 비디오 파일을 처리하여 핸드 랜드마크 데이터를 추출
+    """
     data = []
-    first_index = target.find("/")
-    second_index = target.find("/", first_index+1)
-    third_index = target.find("/", second_index+1)
-    idx = actions.index(target[target.find("/", second_index)+1:target.find("/", third_index)])
-
-    print("Now Streaming :", target)
-    cap = cv2.VideoCapture(target)
-
-    # 열렸는지 확인
+    idx = actions.index(video_path.split("/")[-2])
+    print("Now Streaming:", video_path)
+    
+    cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Camera open failed!")
         sys.exit()
 
-    # 웹캠의 속성 값을 받아오기
-    # 정수 형태로 변환하기 위해 round
     w = round(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = round(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS) # 카메라에 따라 값이 정상적, 비정상적
-    print(w,h,'fps : ', fps)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    delay = round(1000/fps) if fps != 0 else round(1000/30)
 
-    if fps != 0:
-        delay = round(1000/fps)
-    else:
-        delay = round(1000/30)
-
-    # 프레임을 받아와서 저장하기
     while True:
         ret, img = cap.read()
-
         if not ret:
             break
 
         img = detector.findHolistic(img, draw=True)
-        # _, left_hand_lmList = detector.findLefthandLandmark(img)
         _, right_hand_lmList = detector.findRighthandLandmark(img)
 
-        
-        # if len(left_hand_lmList) != 0 and len(right_hand_lmList) != 0:
-        # if left_hand_lmList is not None or right_hand_lmList is not None:
         if right_hand_lmList is not None:
-            joint = np.zeros((42, 2)) # (21,2)
-            
-            # 왼손 랜드마크 리스트
-            # for j, lm in enumerate(left_hand_lmList.landmark):
-                # joint[j] = [lm.x, lm.y]
-            
-            # 오른손 랜드마크 리스트
+            joint = np.zeros((42, 2))
             for j, lm in enumerate(right_hand_lmList.landmark):
-                # joint[j+21] = [lm.x, lm.y]
                 joint[j] = [lm.x, lm.y]
 
-            # 벡터 정규화
+            # 벡터 정규화 및 각도 계산
             vector, angle_label = Vector_Normalization(joint)
-
-            # 정답 라벨링
             angle_label = np.append(angle_label, idx)
-
-            # 위치 종속성을 가지는 데이터 저장
-            # d = np.concatenate([joint.flatten(), angle_label])
-
-            # 벡터 정규화를 활용한 위치 종속성 제거
             d = np.concatenate([vector.flatten(), angle_label.flatten()])
-            
             data.append(d)
 
-        
-
-        # draw box
-        # cv2.rectangle(img, (0,0), (w, 30), (245, 117, 16), -1)
-
-        # draw text target name
-        # cv2.putText(img, target, (15,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-
-
-        # cv2.imshow('img', img)
         cv2.waitKey(delay)
-
-        # esc를 누르면 강제 종료
-        if cv2.waitKey(delay) == 27: 
+        if cv2.waitKey(delay) == 27:  # ESC 키를 누르면 종료
             break
 
-    print("\n---------- Finish Video Streaming ----------")
+    print("Finish Video Streaming")
+    return np.array(data), idx
 
-    data = np.array(data)
-
-    # Create sequence data
-    print('len(data)-seq_lenth:', len(data) - seq_length)
+# 각 비디오 처리
+for target in testTargetList:
+    data, idx = process_video(target)
+    
+    # 시퀀스 데이터 생성
     for seq in range(len(data) - seq_length):
-        dataset[idx].append(data[seq:seq + seq_length])    
+        dataset[idx].append(data[seq:seq + seq_length])
 
+# 데이터 저장 (현재 주석 처리됨)
 '''
-for i in range(len(actions)):
-    save_data = np.array(dataset[i])
-    np.save(os.path.join('dataset', f'seq_{actions[i]}_{created_time}'), save_data)
+def save_dataset():
+    """
+    추출된 데이터셋을 파일로 저장
+    """
+    created_time = int(time.time())
+    for i in range(len(actions)):
+        save_data = np.array(dataset[i])
+        np.save(os.path.join('dataset', f'seq_{actions[i]}_{created_time}'), save_data)
+    print("Finish Save Dataset")
 
-
-print("\n---------- Finish Save Dataset ----------")
+save_dataset()
 '''
-
-
-
