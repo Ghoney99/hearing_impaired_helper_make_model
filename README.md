@@ -87,10 +87,3 @@ jupyter notebook train_hand_gesture.ipynb
 python webcam_test_model_tflite.py
 ```
 
-## 🤝 기여하기
-
-프로젝트 개선을 위한 제안이나 버그 리포트는 언제나 환영합니다. 이슈를 열거나 풀 리퀘스트를 보내주세요!
-
-## 📄 라이센스
-
-이 프로젝트는 [MIT 라이센스](LICENSE)하에 배포됩니다.
