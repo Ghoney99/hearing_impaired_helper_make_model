@@ -1,24 +1,78 @@
-프로젝트명
 수어 인식 및 번역 모델
+📋 프로젝트 개요
+본 프로젝트는 청각장애 학생들의 교육 환경 개선을 위한 수어 인식 및 번역 모델 개발을 목표로 합니다.
+🎯 개발 배경
 
-설명
+국립국어원 2020년 보고서: 청각장애 학생 50.4%가 '수어 없는 수업 내용 이해 어려움' 호소
+2023년 특수교육통계: 농학생 80.3%가 일반학교 재학 중
+수어 교육 부재와 수업 참여의 어려움 해소 필요성 대두
 
-개발 배경
-청각장애 학생들은 일반 교육 환경에서 여러 어려움에 직면합니다. 국립국어원의 2020년 보고서에 따르면, 전체 청각장애 학생 중 50.4%가 '수어 없는 수업의 내용을 이해하지 못한다'고 응답했습니다. 또한, 2023년 특수교육통계에 따르면 농학생 중 80.3%가 일반학교에 재학 중입니다. 이는 수어 교육의 부재와 함께 수업 참여의 어려움을 야기합니다.
+📊 데이터셋
 
-기술 스택
-TensorFlow
-Keras
-MediaPipe
-OpenCV
+출처: AI Hub - 수어영상
+구성:
 
-사용 방법
-1. create_dataset_from_video.py
-- 수어 데이터를 활용하여 양손 관절 및 각도를 시퀀스 데이터로 변환하여 npy 파일로 저장합니다.
+총 536,000 수어영상 클립 (.mp4)
+수어문장 2000개, 수어단어 3000개
+지숫자/지문자 1000개
 
-2. train_hand_gesture.ipynb
-- npy file load하여 모델을 생성합니다.
-- keras model, tflite model 두 종류의 모델을 생성합니다. (tflite model만 활용)
 
-3. webcam_test_model : 웹캠을 활용하여 테스트합니다.
-- tflite.py : tflite model을 테스트합니다.
+사용: 지문자 영상에 대해서만 학습 진행
+(저작권 문제로 실제 datasets에는 다른 파일 포함)
+
+🛠 기술 스택
+Show Image
+Show Image
+Show Image
+Show Image
+💻 주요 기능 및 구현
+1. 데이터 전처리 (create_dataset_from_video.py)
+
+데이터 수집 및 초기 처리
+
+OpenCV 활용 비디오 데이터 읽기 (cv2.VideoCapture)
+30fps 비디오에서 초당 30개 이미지 추출
+
+
+키포인트 추출
+
+MediaPipe HolisticDetector로 프레임별 21개 키포인트 추출
+
+
+키포인트 데이터 가공
+
+키포인트를 벡터와 각도 정보로 변환
+관절 움직임 표현을 위한 벡터 각도 계산
+
+
+데이터 정규화 및 형식화
+
+벡터 값 정규화 및 각도 정보 계산 (arccosine 함수 사용)
+56차원 데이터 생성: (20,2) 벡터 값 + 15개 각도 값 + 라벨
+
+
+시퀀스 데이터 생성
+
+비디오 데이터를 시퀀스 형태로 변환 (시퀀스 길이: 10)
+최종 데이터 형태: (488, 10, 56) (데이터 개수, 시퀀스 길이, 특성 값)
+
+
+
+2. 모델 학습 (train_hand_gesture.ipynb)
+
+npy 파일 로드 후 모델 생성
+keras model 및 tflite model 생성 (tflite model 활용)
+
+모델 구성:
+
+L2 Norm regularization (과적합 방지)
+ReLU 활성화 함수
+Dropout(0.3) (과적합 방지)
+Categorical_CrossEntropy 손실 함수
+Adam 옵티마이저
+ReduceLROnPlateau (학습률 자동 조정)
+21 Epoch (Early stopping 적용)
+
+3. 실시간 테스트 (webcam_test_model_tflite.py)
+
+웹캠을 활용한 실시간 수어 인식 테스트
